@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct XboxGame {
@@ -95,6 +98,7 @@ fn scan_windows_packages() -> Result<Vec<XboxGame>, String> {
             "-Command",
             powershell_script(),
         ])
+        .creation_flags(0x08000000)
         .output()
         .map_err(|error| {
             format!(
