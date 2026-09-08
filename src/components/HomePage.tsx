@@ -1,5 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
+import {
+  ChevronRight,
+  CircleGauge,
+  Download,
+  Gamepad2,
+  HardDrive,
+  Library,
+  MemoryStick,
+  Microchip,
+  PackageOpen,
+  Settings2,
+  Tag,
+  Wifi,
+} from "lucide-react";
+import pandaLogo from "../assets/pandavault-new-logo.png";
+import heroArt from "../assets/pandavault-hero-art.png";
+import steamIcon from "../assets/launcher-steam.png";
+import epicIcon from "../assets/launcher-epic.png";
+import eaIcon from "../assets/launcher-ea.png";
+import ubisoftIcon from "../assets/launcher-ubisoft.png";
+import xboxIcon from "../assets/launcher-xbox.png";
+import battlenetIcon from "../assets/launcher-battlenet.png";
 import "./HomePage.css";
 
 type SteamGame = {
@@ -60,140 +82,57 @@ type HomePageProps = {
   onNavigate: (destination: string) => void;
 };
 
-const browserHeroArtwork: Record<string, string> = {
-  "4514930":
-    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4514930/2c98296e57c59436102a09392d37b71338e27cf6/library_hero.jpg",
-  "1267910":
-    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1267910/library_hero.jpg",
-  "1142710":
-    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1142710/library_hero.jpg",
-};
-
 const browserCardArtwork: Record<string, string> = {
-  "4514930":
-    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4514930/268bb497efc35744f6bc6de482e0cbc1b8eb1760/header.jpg",
-  "1267910":
-    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1267910/header.jpg",
-  "1142710":
-    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1142710/header.jpg",
+  "4514930": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4514930/268bb497efc35744f6bc6de482e0cbc1b8eb1760/header.jpg",
+  "1267910": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1267910/header.jpg",
+  "1142710": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/1142710/header.jpg",
 };
-
-function formatDuration(seconds: number) {
-  const totalMinutes = Math.floor(Math.max(0, seconds) / 60);
-
-  if (totalMinutes < 60) {
-    return `${totalMinutes}m`;
-  }
-
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
-}
 
 function formatBytes(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return "0 GB";
-  }
-
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 GB";
   const gigabytes = bytes / 1024 / 1024 / 1024;
-
-  if (gigabytes >= 1024) {
-    return `${(gigabytes / 1024).toFixed(1)} TB`;
-  }
-
+  if (gigabytes >= 1024) return `${(gigabytes / 1024).toFixed(1)} TB`;
   return `${gigabytes.toFixed(gigabytes >= 100 ? 0 : 1)} GB`;
 }
 
-function formatSteamMinutes(minutes: number | null) {
-  if (minutes === null) {
-    return "Unknown";
-  }
-
-  return formatDuration(minutes * 60);
-}
-
 function relativePlayed(timestamp: number) {
-  if (!timestamp) {
-    return "Not played yet";
-  }
-
-  const seconds =
-    Math.floor(Date.now() / 1000) - timestamp;
-
-  if (seconds < 3600) {
-    return "Just played";
-  }
-
+  if (!timestamp) return "Not played yet";
+  const seconds = Math.floor(Date.now() / 1000) - timestamp;
+  if (seconds < 3600) return "Just played";
   const hours = Math.floor(seconds / 3600);
-
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-
+  if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
-
-  if (days === 1) {
-    return "Yesterday";
-  }
-
-  if (days < 7) {
-    return `${days} days ago`;
-  }
-
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
   return `${Math.floor(days / 7)}w ago`;
 }
 
 function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
 }
+
+const launcherCards = [
+  { key: "steam", label: "Steam", icon: steamIcon },
+  { key: "epic", label: "Epic Games", icon: epicIcon },
+  { key: "ea", label: "EA App", icon: eaIcon },
+  { key: "ubisoft", label: "Ubisoft Connect", icon: ubisoftIcon },
+  { key: "xbox", label: "Xbox", icon: xboxIcon },
+];
 
 export default function HomePage({
   steamScan,
   steamError,
-  analytics,
   analyticsError,
   onNavigate,
 }: HomePageProps) {
   const games = steamScan?.games ?? [];
+  const demoMode = !isTauri();
 
   const [artwork, setArtwork] = useState<Record<string, string>>({});
-  const [brokenArtwork, setBrokenArtwork] =
-    useState<Record<string, boolean>>({});
-
-  const recentGames = useMemo(
-    () =>
-      [...games]
-        .sort((a, b) => b.lastPlayed - a.lastPlayed)
-        .slice(0, 3),
-    [games],
-  );
-
-  const featuredGame =
-    recentGames[0] ?? games[0] ?? null;
+  const [brokenArtwork, setBrokenArtwork] = useState<Record<string, boolean>>({});
 
   const totalStorage = useMemo(
-    () =>
-      games.reduce(
-        (total, game) => total + game.sizeOnDisk,
-        0,
-      ),
-    [games],
-  );
-
-  const totalSteamMinutes = useMemo(
-    () =>
-      games.reduce(
-        (total, game) =>
-          total + (game.steamPlaytimeMinutes ?? 0),
-        0,
-      ),
+    () => games.reduce((total, game) => total + game.sizeOnDisk, 0),
     [games],
   );
 
@@ -208,501 +147,166 @@ export default function HomePage({
 
       if (!isTauri()) {
         const nextArtwork: Record<string, string> = {};
-
         for (const game of games) {
-          const url =
-            browserCardArtwork[game.appId] ??
-            `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${game.appId}/header.jpg`;
-
-          nextArtwork[game.appId] = url;
+          nextArtwork[game.appId] = browserCardArtwork[game.appId] ?? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${game.appId}/header.jpg`;
         }
-
-        if (!cancelled) {
-          setArtwork(nextArtwork);
-        }
-
+        if (!cancelled) setArtwork(nextArtwork);
         return;
       }
 
-      if (!steamScan?.steamPath) {
-        return;
-      }
+      if (!steamScan?.steamPath) return;
 
       try {
-        const imported = await invoke<GameArtwork[]>(
-          "import_steam_artwork",
-          {
-            steamPath: steamScan.steamPath,
-            appIds: games.map((game) => game.appId),
-          },
-        );
-
+        const imported = await invoke<GameArtwork[]>("import_steam_artwork", {
+          steamPath: steamScan.steamPath,
+          appIds: games.map((game) => game.appId),
+        });
         const nextArtwork: Record<string, string> = {};
-
         for (const item of imported) {
-          if (item.artworkPath) {
-            nextArtwork[item.appId] =
-              convertFileSrc(item.artworkPath);
-          }
+          if (item.artworkPath) nextArtwork[item.appId] = convertFileSrc(item.artworkPath);
         }
-
-        if (!cancelled) {
-          setArtwork(nextArtwork);
-        }
+        if (!cancelled) setArtwork(nextArtwork);
       } catch (error) {
-        console.error(
-          "Unable to load PandaVault Home artwork:",
-          error,
-        );
+        console.error("Unable to load PandaVault Home artwork:", error);
       }
     }
 
     refreshArtwork();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [games, steamScan?.steamPath]);
 
-  const featuredArtwork =
-    featuredGame && !brokenArtwork[`hero-${featuredGame.appId}`]
-      ? !isTauri()
-        ? browserHeroArtwork[featuredGame.appId] ??
-          artwork[featuredGame.appId]
-        : artwork[featuredGame.appId]
-      : null;
+  const recentGames = games.slice(0, 8);
+  const remainingSlots = Math.max(0, 8 - recentGames.length);
+  const recentLaunchers = launcherCards.slice(0, remainingSlots);
+  const systemReady = !steamError && !analyticsError;
 
   return (
-    <div className="pv-home">
-      <section className="pv-home-hero">
-        {featuredArtwork ? (
-          <img
-            className="pv-home-hero-art"
-            src={featuredArtwork}
-            alt=""
-            onError={() => {
-              if (!featuredGame) return;
+    <div className="pv-ref-home">
+      <div className="pv-ref-main-column">
+        <section className="pv-ref-panel pv-ref-hero">
+          <div className="pv-ref-hero-copy">
+            <div className="pv-ref-hero-brand">
+              <img src={pandaLogo} alt="" />
+              <div>
+                <div className="pv-ref-hero-wordmark"><span>PANDA</span><strong>VAULT</strong></div>
+                <p>YOUR GAMING PC. ORGANISED.</p>
+              </div>
+            </div>
 
-              setBrokenArtwork((current) => ({
-                ...current,
-                [`hero-${featuredGame.appId}`]: true,
-              }));
-            }}
-          />
-        ) : null}
+            <div className="pv-ref-hero-pillars">
+              <div><Gamepad2 size={28} /><span><strong>PLAY</strong><small>Your Games</small></span></div>
+              <div><Library size={28} /><span><strong>ORGANISE</strong><small>All Your Content</small></span></div>
+              <div><Download size={28} /><span><strong>DOWNLOAD</strong><small>When You Need It</small></span></div>
+              <div><span className="pv-ref-star">★</span><span><strong>ENJOY</strong><small>Your Way</small></span></div>
+            </div>
 
-        <div className="pv-home-hero-fallback" />
-        <div className="pv-home-hero-overlay" />
-        <div className="pv-home-hero-lines" />
+            <div className="pv-ref-hero-footer">ONE HUB. TOTAL CONTROL.</div>
+          </div>
+          <div className="pv-ref-hero-art"><img src={heroArt} alt="" /></div>
+        </section>
 
-        <div className="pv-home-hero-content">
-          <span className="pv-home-eyebrow">
-            {featuredGame
-              ? "CONTINUE PLAYING"
-              : "WELCOME TO PANDAVAULT"}
-          </span>
-
-          <h2>
-            {featuredGame?.name ??
-              "YOUR GAMING PC. ORGANISED."}
-          </h2>
-
-          <p className="pv-home-hero-lead">
-            {featuredGame
-              ? "Jump back in, or see what else deserves your time."
-              : "Play, manage, discover and stay informed from one gaming command centre."}
-          </p>
-
-          <div className="pv-home-hero-actions">
-            <button
-              type="button"
-              className="pv-home-primary"
-              onClick={() => onNavigate("Library")}
-            >
-              <span>{"\u25B6"}</span>
-              OPEN LIBRARY
+        <section className="pv-ref-panel pv-ref-quick">
+          <h2>Quick Actions</h2>
+          <div className="pv-ref-quick-grid">
+            <button type="button" onClick={() => onNavigate("Game Library")}>
+              <Gamepad2 size={28} /><span><strong>Scan for Games</strong><small>Find installed games</small></span><ChevronRight size={20} />
             </button>
-
-            <button
-              type="button"
-              className="pv-home-secondary"
-              onClick={() => onNavigate("News")}
-            >
-              GAMING NEWS
-              <span>{"\u2192"}</span>
+            <button type="button" onClick={() => onNavigate("Game Library")}>
+              <Library size={28} /><span><strong>Game Library</strong><small>Browse your collection</small></span><ChevronRight size={20} />
+            </button>
+            <button type="button" onClick={() => onNavigate("Deals")}>
+              <Tag size={28} /><span><strong>Find Deals</strong><small>Wishlist & price tracking</small></span><ChevronRight size={20} />
+            </button>
+            <button type="button" onClick={() => onNavigate("Tools")}>
+              <Settings2 size={28} /><span><strong>Tools</strong><small>Manage your gaming PC</small></span><ChevronRight size={20} />
             </button>
           </div>
-        </div>
+        </section>
 
-        {featuredGame ? (
-          <div className="pv-home-hero-meta">
-            <div>
-              <span>LAST PLAYED</span>
-              <strong>
-                {relativePlayed(featuredGame.lastPlayed)}
-              </strong>
-            </div>
-
-            <div>
-              <span>STEAM PLAYTIME</span>
-              <strong>
-                {formatSteamMinutes(
-                  featuredGame.steamPlaytimeMinutes,
-                )}
-              </strong>
-            </div>
-
-            <div>
-              <span>INSTALL SIZE</span>
-              <strong>
-                {formatBytes(featuredGame.sizeOnDisk)}
-              </strong>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="pv-home-hero-bottom">
-          <span>PLAY</span>
-          <i />
-          <span>MANAGE</span>
-          <i />
-          <span>DISCOVER</span>
-          <i />
-          <span>STAY INFORMED</span>
-        </div>
-      </section>
-
-      <section className="pv-home-summary">
-        <article>
-          <span className="pv-home-summary-icon">{"\u25C6"}</span>
-          <div>
-            <strong>{games.length}</strong>
-            <span>Installed games</span>
-          </div>
-        </article>
-
-        <article>
-          <span className="pv-home-summary-icon">{"\u25A3"}</span>
-          <div>
-            <strong>{formatBytes(totalStorage)}</strong>
-            <span>Library storage</span>
-          </div>
-        </article>
-
-        <article>
-          <span className="pv-home-summary-icon">{"\u25F7"}</span>
-          <div>
-            <strong>
-              {formatDuration(totalSteamMinutes * 60)}
-            </strong>
-            <span>Steam playtime</span>
-          </div>
-        </article>
-
-        <article>
-          <span className="pv-home-summary-icon">{"\u25A5"}</span>
-          <div>
-            <strong>{analytics?.sessionCount ?? 0}</strong>
-            <span>PandaVault sessions</span>
-          </div>
-        </article>
-      </section>
-
-      <section className="pv-home-section">
-        <header className="pv-home-section-heading">
-          <div>
-            <span className="pv-home-section-kicker">
-              YOUR GAMES
-            </span>
-            <h3>Continue Playing</h3>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("Library")}
-          >
-            VIEW LIBRARY {"\u2192"}
-          </button>
-        </header>
-
-        <div className="pv-home-game-grid">
-          {recentGames.map((game) => {
-            const imageBroken =
-              brokenArtwork[`card-${game.appId}`];
-
-            return (
-              <button
-                type="button"
-                className="pv-home-game-card"
-                key={game.appId}
-                onClick={() => onNavigate("Library")}
-              >
-                <div className="pv-home-game-image">
-                  <div className="pv-home-game-fallback">
-                    {initials(game.name)}
+        <section className="pv-ref-panel pv-ref-recent">
+          <div className="pv-ref-section-head"><h2>Recent Games</h2><button type="button" onClick={() => onNavigate("Game Library")}>View All</button></div>
+          <div className="pv-ref-game-row">
+            {recentGames.map((game) => {
+              const key = `ref-${game.appId}`;
+              const gameArtwork = artwork[game.appId];
+              const broken = brokenArtwork[key];
+              return (
+                <button className="pv-ref-game-card" key={game.appId} type="button" onClick={() => onNavigate("Game Library")}>
+                  <div className="pv-ref-game-art">
+                    {gameArtwork && !broken ? (
+                      <img src={gameArtwork} alt="" onError={() => setBrokenArtwork((current) => ({ ...current, [key]: true }))} />
+                    ) : <span>{initials(game.name)}</span>}
                   </div>
-
-                  {artwork[game.appId] && !imageBroken ? (
-                    <img
-                      src={artwork[game.appId]}
-                      alt=""
-                      onError={() =>
-                        setBrokenArtwork((current) => ({
-                          ...current,
-                          [`card-${game.appId}`]: true,
-                        }))
-                      }
-                    />
-                  ) : null}
-
-                  <span className="pv-home-game-play">
-                    {"\u25B6"}
-                  </span>
-                </div>
-
-                <div className="pv-home-game-info">
-                  <div>
-                    <strong>{game.name}</strong>
-                    <span>
-                      {relativePlayed(game.lastPlayed)}
-                    </span>
-                  </div>
-
-                  <small>
-                    {formatSteamMinutes(
-                      game.steamPlaytimeMinutes,
-                    )}
-                  </small>
-                </div>
+                  <strong>{game.name}</strong>
+                  <small>{relativePlayed(game.lastPlayed)}</small>
+                </button>
+              );
+            })}
+            {recentLaunchers.map((launcher) => (
+              <button className="pv-ref-game-card" key={launcher.key} type="button" onClick={() => onNavigate("Launchers")}>
+                <div className="pv-ref-game-art pv-ref-launcher-art"><img src={launcher.icon} alt="" /></div>
+                <strong>{launcher.label}</strong>
+                <small>Launcher</small>
               </button>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="pv-home-world">
-        <article className="pv-home-feature-panel pv-home-news-panel">
-          <div className="pv-home-panel-topline">
-            <span>FOR YOU</span>
-            <button
-              type="button"
-              onClick={() => onNavigate("News")}
-            >
-              OPEN NEWS {"\u2192"}
-            </button>
+            ))}
           </div>
+        </section>
 
-          <h3>Your gaming feed is coming to PandaVault.</h3>
-
-          <p>
-            News about games you own, updates from developers,
-            PC headlines and optional PlayStation, Xbox and
-            Nintendo coverage.
-          </p>
-
-          <div className="pv-home-platforms">
-            <span>PC</span>
-            <span>PLAYSTATION</span>
-            <span>XBOX</span>
-            <span>NINTENDO</span>
-          </div>
-
-          <div className="pv-home-news-preview">
-            <span>PERSONALISED</span>
-            <strong>
-              News that understands what you actually play.
-            </strong>
-          </div>
-        </article>
-
-        <article className="pv-home-feature-panel pv-home-health-panel">
-          <div className="pv-home-panel-topline">
-            <span>GAME HEALTH</span>
-            <button
-              type="button"
-              onClick={() => onNavigate("Game Health")}
-            >
-              OPEN HEALTH {"\u2192"}
-            </button>
-          </div>
-
-          <h3>Is your gaming PC ready?</h3>
-
-          <div className="pv-home-health-list">
-            <div>
-              <span className="pv-home-health-good">
-                {"\u2713"}
-              </span>
-
-              <p>
-                <strong>Steam library</strong>
-                <small>
-                  {steamError
-                    ? "Needs attention"
-                    : `${games.length} installed games detected`}
-                </small>
-              </p>
+        <section className="pv-ref-bottom-grid">
+          <article className="pv-ref-panel pv-ref-bottom-card">
+            <div className="pv-ref-section-head"><h2>Latest Download</h2><ChevronRight size={16} /></div>
+            <div className="pv-ref-download-row">
+              <div className="pv-ref-download-icon"><PackageOpen size={22} /></div>
+              <div><strong>{demoMode ? "Forza Horizon 5 - Update" : "No active download"}</strong><div className="pv-ref-progress"><i style={{ width: demoMode ? "56%" : "0%" }} /></div><small>{demoMode ? "2.4 GB / 5.1 GB" : "Downloads are idle"}</small></div>
+              <span>{demoMode ? "56%" : "—"}</span>
             </div>
+          </article>
 
-            <div>
-              <span className="pv-home-health-good">
-                {"\u2713"}
-              </span>
-
-              <p>
-                <strong>Play tracking</strong>
-                <small>
-                  {analyticsError
-                    ? "Analytics unavailable"
-                    : `${analytics?.sessionCount ?? 0} sessions recorded`}
-                </small>
-              </p>
+          <article className="pv-ref-panel pv-ref-bottom-card">
+            <h2>System Overview</h2>
+            <div className="pv-ref-system-chips">
+              <div><Microchip size={22} /><span>CPU<small>{demoMode ? "12%" : "—"}</small></span></div>
+              <div><CircleGauge size={22} /><span>GPU<small>{demoMode ? "28%" : "—"}</small></span></div>
+              <div><MemoryStick size={22} /><span>RAM<small>{demoMode ? "46%" : "—"}</small></span></div>
+              <div><HardDrive size={22} /><span>Storage<small>{demoMode ? "62%" : "—"}</small></span></div>
             </div>
+          </article>
 
-            <div>
-              <span className="pv-home-health-next">
-                +
-              </span>
-
-              <p>
-                <strong>Mod & update intelligence</strong>
-                <small>
-                  Next stage of Game Health
-                </small>
-              </p>
+          <article className="pv-ref-panel pv-ref-bottom-card">
+            <div className="pv-ref-section-head"><h2>Storage</h2><ChevronRight size={16} /></div>
+            <div className="pv-ref-storage-row">
+              <HardDrive size={27} />
+              <div><strong>Game Storage</strong><div className="pv-ref-progress"><i style={{ width: demoMode ? "60%" : "45%" }} /></div><small>{formatBytes(totalStorage)} detected</small></div>
+              <span>{demoMode ? "60%" : ""}</span>
             </div>
+          </article>
+        </section>
+      </div>
 
-            <div>
-              <span className="pv-home-health-next">
-                +
-              </span>
-
-              <p>
-                <strong>Storage intelligence</strong>
-                <small>
-                  Find space you can reclaim
-                </small>
-              </p>
-            </div>
+      <aside className="pv-ref-right-rail">
+        <section className="pv-ref-panel pv-ref-shortcuts">
+          <div className="pv-ref-section-head"><h2>Shortcuts</h2><button type="button">◇ Edit</button></div>
+          <div className="pv-ref-launchers">
+            <button type="button" onClick={() => onNavigate("Game Library")}><img src={steamIcon} alt="" /><span>Steam</span></button>
+            <button type="button" onClick={() => onNavigate("Game Library")}><img src={epicIcon} alt="" /><span>Epic Games</span></button>
+            <button type="button" onClick={() => onNavigate("Launchers")}><img src={eaIcon} alt="" /><span>EA App</span></button>
+            <button type="button" onClick={() => onNavigate("Launchers")}><img src={ubisoftIcon} alt="" /><span>Ubisoft Connect</span></button>
+            <button type="button" onClick={() => onNavigate("Launchers")}><img src={xboxIcon} alt="" /><span>Xbox</span></button>
+            <button type="button" onClick={() => onNavigate("Launchers")}><img src={battlenetIcon} alt="" /><span>Battle.net</span></button>
           </div>
-        </article>
-      </section>
+        </section>
 
-      <section className="pv-home-section">
-        <header className="pv-home-section-heading">
-          <div>
-            <span className="pv-home-section-kicker">
-              THE CONTROL CENTRE
-            </span>
-            <h3>Everything Around Your Games</h3>
-          </div>
-        </header>
+        <section className="pv-ref-panel pv-ref-status">
+          <h2>System Status</h2>
+          <div className={systemReady ? "pv-ref-all-good" : "pv-ref-all-good pv-ref-attention"}><i /><strong>{systemReady ? "All Systems Go" : "Needs Attention"}</strong></div>
+          <div className="pv-ref-status-row"><Wifi size={27} /><span><strong>Internet</strong><small>{demoMode ? "Connected" : "Available in desktop telemetry"}</small></span></div>
+          <div className="pv-ref-status-row"><HardDrive size={27} /><span><strong>Disk Space</strong><small>{demoMode ? "412 GB free" : `${formatBytes(totalStorage)} game data`}</small></span></div>
+          <div className="pv-ref-status-row"><Settings2 size={27} /><span><strong>Game Scanners</strong><small>{steamError ? "Needs attention" : "Ready"}</small></span></div>
+          <div className="pv-ref-status-row"><Download size={27} /><span><strong>Downloads</strong><small>Idle</small></span></div>
+        </section>
 
-        <div className="pv-home-capabilities">
-          <button
-            type="button"
-            onClick={() => onNavigate("News")}
-          >
-            <span className="pv-home-capability-symbol">
-              {"\u2630"}
-            </span>
-            <small>PERSONALISED</small>
-            <strong>Gaming News</strong>
-            <p>
-              PC first, with the console coverage you choose.
-            </p>
-            <em>IN DEVELOPMENT</em>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("Game Health")}
-          >
-            <span className="pv-home-capability-symbol">
-              {"\u2713"}
-            </span>
-            <small>KEEP IT READY</small>
-            <strong>Game Health</strong>
-            <p>
-              Updates, mods, storage, saves and game readiness.
-            </p>
-            <em>BUILDING NOW</em>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("Deals")}
-          >
-            <span className="pv-home-capability-symbol">
-              {"\u00A3"}
-            </span>
-            <small>SPEND SMARTER</small>
-            <strong>Deals & Wishlist</strong>
-            <p>
-              Discover discounts that actually matter to you.
-            </p>
-            <em>PLANNED</em>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("Mods")}
-          >
-            <span className="pv-home-capability-symbol">
-              {"\u25C6"}
-            </span>
-            <small>CONTROL YOUR SETUP</small>
-            <strong>Mods</strong>
-            <p>
-              One place for installed mods and health checks.
-            </p>
-            <em>PLANNED</em>
-          </button>
-        </div>
-      </section>
-
-      <section className="pv-home-social">
-        <div>
-          <span className="pv-home-section-kicker">
-            SOCIAL WITHOUT REPLACING DISCORD
-          </span>
-
-          <h3>Know what your gaming world is doing.</h3>
-
-          <p>
-            PandaVault will complement Discord rather than
-            compete with it — games, activity and useful social
-            context alongside the tools that manage your PC.
-          </p>
-        </div>
-
-        <div className="pv-home-social-card">
-          <span>DISCORD COMPANION</span>
-          <strong>Friends Playing</strong>
-          <p>
-            Integration will be added only through supported
-            Discord APIs.
-          </p>
-          <em>FUTURE INTEGRATION</em>
-        </div>
-      </section>
-
-      <footer className="pv-home-footer-v3">
-        <div>
-          <span>PANDAVAULT</span>
-          <strong>YOUR GAMING PC. ORGANISED.</strong>
-        </div>
-
-        <p>
-          PLAY
-          <i />
-          MANAGE
-          <i />
-          DISCOVER
-          <i />
-          STAY INFORMED
-        </p>
-      </footer>
+        <div className="pv-ref-quote">“GAMES, MEDIA, IDEAS.<br />ALL IN ONE PLACE.”<i /></div>
+      </aside>
     </div>
   );
 }

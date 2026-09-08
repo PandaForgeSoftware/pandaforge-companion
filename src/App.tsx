@@ -1,22 +1,24 @@
 import { useEffect, useState } from "react";
 import {
   Bell,
-  ChevronLeft,
-  ChevronRight,
   CircleUserRound,
+  Download,
   Gamepad2,
   HeartPulse,
   Home,
   Library,
-  Menu,
+  Minus,
   Newspaper,
   PackageOpen,
+  Rocket,
   Search,
   Settings,
-  Sparkles,
+  Square,
   Tag,
+  Wrench,
+  X,
 } from "lucide-react";
-import pandaVaultEmblem from "./assets/PandaVault Logo Blank.png";
+import pandaVaultLogo from "./assets/pandavault-new-logo.png";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import GameLibrariesPage from "./components/GameLibrariesPage";
 import LibraryPage from "./components/LibraryPage";
@@ -46,7 +48,6 @@ type SteamScanResult = {
   games: SteamGame[];
 };
 
-
 type EpicGame = {
   appName: string;
   name: string;
@@ -71,6 +72,7 @@ type EpicScanResult = {
   games: EpicGame[];
   warnings: string[];
 };
+
 type XboxCandidate = {
   name: string;
   packageName: string;
@@ -88,6 +90,7 @@ type XboxScanResult = {
   games: XboxCandidate[];
   warnings: string[];
 };
+
 type GameAnalytics = {
   appId: string;
   gameName: string;
@@ -111,6 +114,7 @@ type AnalyticsSummary = {
   topGames: GameAnalytics[];
   recentSessions: RecentSession[];
 };
+
 const browserDevGames: SteamGame[] = [
   {
     appId: "1267910",
@@ -167,109 +171,72 @@ const browserDevAnalytics: AnalyticsSummary = {
   sessionCount: 8,
   uniqueGames: 3,
   topGames: [
-    {
-      appId: "4514930",
-      gameName: "The Undercut",
-      totalSeconds: 25200,
-      sessionCount: 3,
-    },
-    {
-      appId: "1267910",
-      gameName: "Melvor Idle",
-      totalSeconds: 19800,
-      sessionCount: 3,
-    },
-    {
-      appId: "1142710",
-      gameName: "Total War: WARHAMMER III",
-      totalSeconds: 9600,
-      sessionCount: 2,
-    },
+    { appId: "4514930", gameName: "The Undercut", totalSeconds: 25200, sessionCount: 3 },
+    { appId: "1267910", gameName: "Melvor Idle", totalSeconds: 19800, sessionCount: 3 },
+    { appId: "1142710", gameName: "Total War: WARHAMMER III", totalSeconds: 9600, sessionCount: 2 },
   ],
   recentSessions: [],
 };
 
 type NavIconName =
   | "home"
+  | "games"
   | "library"
+  | "launchers"
   | "health"
-  | "mods"
+  | "downloads"
+  | "deals"
   | "news"
-  | "deals";
+  | "mods"
+  | "tools";
 
 type NavItem = {
   label: string;
   icon: NavIconName;
 };
 
-type NavGroup = {
-  label: string;
-  items: NavItem[];
-};
-
-const navGroups: NavGroup[] = [
-  {
-    label: "PLAY",
-    items: [
-      { label: "Home", icon: "home" },
-      { label: "Library", icon: "library" },
-    ],
-  },
-  {
-    label: "YOUR PC",
-    items: [
-      { label: "Game Health", icon: "health" },
-      { label: "Mods", icon: "mods" },
-    ],
-  },
-  {
-    label: "DISCOVER",
-    items: [
-      { label: "News", icon: "news" },
-      { label: "Deals", icon: "deals" },
-    ],
-  },
+const navItems: NavItem[] = [
+  { label: "Home", icon: "home" },
+  { label: "Games & Apps", icon: "games" },
+  { label: "Game Library", icon: "library" },
+  { label: "Launchers", icon: "launchers" },
+  { label: "Game Health", icon: "health" },
+  { label: "Downloads", icon: "downloads" },
+  { label: "Deals", icon: "deals" },
+  { label: "News", icon: "news" },
+  { label: "Mods", icon: "mods" },
+  { label: "Tools", icon: "tools" },
 ];
 
 function NavIcon({ name }: { name: NavIconName }) {
-  const props = {
-    size: 19,
-    strokeWidth: 1.9,
-    "aria-hidden": true,
-  };
+  const props = { size: 20, strokeWidth: 2, "aria-hidden": true };
 
   switch (name) {
     case "home":
       return <Home {...props} />;
+    case "games":
+      return <Gamepad2 {...props} />;
     case "library":
       return <Library {...props} />;
+    case "launchers":
+      return <Rocket {...props} />;
     case "health":
       return <HeartPulse {...props} />;
-    case "mods":
-      return <PackageOpen {...props} />;
-    case "news":
-      return <Newspaper {...props} />;
+    case "downloads":
+      return <Download {...props} />;
     case "deals":
       return <Tag {...props} />;
+    case "news":
+      return <Newspaper {...props} />;
+    case "mods":
+      return <PackageOpen {...props} />;
+    case "tools":
+      return <Wrench {...props} />;
   }
-}
-
-
-
-
-
-function PandaMark() {
-  return (
-    <div className="panda-mark" aria-label="PandaVault">
-      <span className="panda-mark-glow" aria-hidden="true" />
-      <img src={pandaVaultEmblem} alt="" />
-    </div>
-  );
 }
 
 function App() {
   const [activeNav, setActiveNav] = useState("Home");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [steamScan, setSteamScan] = useState<SteamScanResult | null>(null);
   const [steamError, setSteamError] = useState<string | null>(null);
   const [epicScan, setEpicScan] = useState<EpicScanResult | null>(null);
@@ -280,337 +247,126 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-
     if (!isTauri()) {
       setSteamScan(browserDevSteamScan);
       setSteamError(null);
-
-      return () => {
-        cancelled = true;
-      };
+      return () => { cancelled = true; };
     }
-
     invoke<SteamScanResult>("scan_steam_games")
-      .then((result) => {
-        if (!cancelled) {
-          setSteamScan(result);
-          setSteamError(null);
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setSteamScan(null);
-          setSteamError(String(error));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .then((result) => { if (!cancelled) { setSteamScan(result); setSteamError(null); } })
+      .catch((error) => { if (!cancelled) { setSteamScan(null); setSteamError(String(error)); } });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-
     if (!isTauri()) {
-      setEpicScan({
-        launcherFound: false,
-        manifestDirectoryFound: false,
-        manifestPath: "",
-        games: [],
-        warnings: [],
-      });
+      setEpicScan({ launcherFound: false, manifestDirectoryFound: false, manifestPath: "", games: [], warnings: [] });
       setEpicError(null);
-
-      return () => {
-        cancelled = true;
-      };
+      return () => { cancelled = true; };
     }
-
     invoke<EpicScanResult>("scan_epic_games")
-      .then((result) => {
-        if (!cancelled) {
-          setEpicScan(result);
-          setEpicError(null);
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          setEpicScan(null);
-          setEpicError(String(error));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .then((result) => { if (!cancelled) { setEpicScan(result); setEpicError(null); } })
+      .catch((error) => { if (!cancelled) { setEpicScan(null); setEpicError(String(error)); } });
+    return () => { cancelled = true; };
   }, []);
+
   useEffect(() => {
     let cancelled = false;
-
     if (!isTauri()) {
-      setXboxScan({
-        available: false,
-        games: [],
-        warnings: [],
-      });
-
-      return () => {
-        cancelled = true;
-      };
+      setXboxScan({ available: false, games: [], warnings: [] });
+      return () => { cancelled = true; };
     }
-
     invoke<XboxScanResult>("scan_xbox_games")
-      .then((result) => {
-        if (!cancelled) {
-          // Xbox V1 returns Windows application candidates.
-          // Keep them isolated until actual Xbox / Game Pass
-          // classification is trustworthy.
-          setXboxScan(result);
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          console.warn("Xbox discovery unavailable:", error);
-          setXboxScan(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
+      .then((result) => { if (!cancelled) setXboxScan(result); })
+      .catch((error) => { if (!cancelled) { console.warn("Xbox discovery unavailable:", error); setXboxScan(null); } });
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-
     if (!isTauri()) {
       setAnalytics(browserDevAnalytics);
       setAnalyticsError(null);
-
-      return () => {
-        cancelled = true;
-      };
+      return () => { cancelled = true; };
     }
-
     const loadAnalytics = () => {
       invoke<AnalyticsSummary>("get_analytics_summary")
-        .then((result) => {
-          if (!cancelled) {
-            setAnalytics(result);
-            setAnalyticsError(null);
-          }
-        })
-        .catch((error) => {
-          if (!cancelled) {
-            setAnalytics(null);
-            setAnalyticsError(String(error));
-          }
-        });
+        .then((result) => { if (!cancelled) { setAnalytics(result); setAnalyticsError(null); } })
+        .catch((error) => { if (!cancelled) { setAnalytics(null); setAnalyticsError(String(error)); } });
     };
-
     loadAnalytics();
-
     const interval = window.setInterval(loadAnalytics, 10_000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
+    return () => { cancelled = true; window.clearInterval(interval); };
   }, []);
 
+  const libraryActive = activeNav === "Games & Apps" || activeNav === "Game Library" || activeNav === "Library";
+
   return (
-    <div className={`app-shell ${sidebarCollapsed ? "app-shell-collapsed" : ""}`}>
-      <aside
-        className={`sidebar ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
-        aria-label="PandaVault navigation"
-      >
-        <div className="brand">
-          <PandaMark />
-
-          <div className="brand-copy">
-            <div className="brand-name">
-              <span>PANDA</span>
-              <strong>VAULT</strong>
-            </div>
-            <div className="brand-product">BY PANDAFORGE SOFTWARE</div>
+    <div className="pv-app-shell">
+      <header className="pv-app-header">
+        <div className="pv-header-brand">
+          <img src={pandaVaultLogo} alt="" />
+          <div className="pv-header-brand-copy">
+            <div className="pv-header-wordmark"><span>PANDA</span><strong>VAULT</strong></div>
+            <div className="pv-header-tagline">YOUR GAMING PC. ORGANISED.</div>
           </div>
-
-          <button
-            className="sidebar-collapse-button"
-            type="button"
-            onClick={() => setSidebarCollapsed((value) => !value)}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight size={17} aria-hidden="true" />
-            ) : (
-              <ChevronLeft size={17} aria-hidden="true" />
-            )}
-          </button>
         </div>
 
-        <nav className="nav-list" aria-label="Main navigation">
-          {navGroups.map((group) => (
-            <div className="nav-group" key={group.label}>
-              <div className="nav-group-label">{group.label}</div>
+        <label className="pv-header-search">
+          <Search size={20} aria-hidden="true" />
+          <input type="search" placeholder="Search games, apps, or files..." aria-label="Search PandaVault" />
+        </label>
 
-              <div className="nav-group-items">
-                {group.items.map((item) => {
-                  const active = activeNav === item.label;
-
-                  return (
-                    <button
-                      key={item.label}
-                      type="button"
-                      className={`nav-item ${active ? "nav-item-active" : ""}`}
-                      onClick={() => setActiveNav(item.label)}
-                      aria-current={active ? "page" : undefined}
-                      aria-label={sidebarCollapsed ? item.label : undefined}
-                      title={sidebarCollapsed ? item.label : undefined}
-                    >
-                      <span className="nav-icon">
-                        <NavIcon name={item.icon} />
-                      </span>
-                      <span className="nav-label">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+        <div className="pv-header-right">
+          <div className="pv-window-controls" aria-hidden="true">
+            <button type="button" tabIndex={-1}><Minus size={16} /></button>
+            <button type="button" tabIndex={-1}><Square size={13} /></button>
+            <button type="button" tabIndex={-1}><X size={16} /></button>
+          </div>
+          <div className="pv-header-bottom-row">
+            <div className="pv-header-motto">
+              <span>PLAY</span><i />
+              <span>ORGANISE</span><i />
+              <span>DOWNLOAD</span><i />
+              <span>ENJOY</span>
             </div>
-          ))}
+            <button className="pv-header-icon" type="button" onClick={() => setActiveNav("Settings")} aria-label="Settings"><Settings size={20} /></button>
+            <button className="pv-header-profile" type="button" aria-label="Profile"><CircleUserRound size={22} /></button>
+            <button className="pv-header-icon pv-header-notify" type="button" aria-label="Notifications"><Bell size={18} /></button>
+          </div>
+        </div>
+      </header>
+
+      <aside className="pv-app-sidebar" aria-label="PandaVault navigation">
+        <nav className="pv-sidebar-nav">
+          {navItems.map((item) => {
+            const active = activeNav === item.label || (item.label === "Game Library" && libraryActive && activeNav === "Library");
+            return (
+              <button key={item.label} type="button" className={active ? "pv-sidebar-item is-active" : "pv-sidebar-item"} onClick={() => setActiveNav(item.label)} aria-current={active ? "page" : undefined}>
+                <NavIcon name={item.icon} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
 
-        <div className="sidebar-spacer" />
-
-        <div
-          className={`system-card ${
-            steamError
-              ? "system-card-error"
-              : steamScan
-                ? "system-card-ready"
-                : "system-card-scanning"
-          }`}
-          title={
-            steamError
-              ? steamError
-              : steamScan
-                ? `${steamScan.games.length} installed Steam games`
-                : "Scanning local Steam library"
-          }
-        >
-          <div className="system-card-icon">
-            <Gamepad2 size={18} aria-hidden="true" />
-            <span
-              className={`status-dot ${
-                steamError ? "status-error" : "status-ready"
-              }`}
-            />
+        <div className="pv-sidebar-bottom">
+          <button className={activeNav === "Settings" ? "pv-sidebar-settings is-active" : "pv-sidebar-settings"} type="button" onClick={() => setActiveNav("Settings") }>
+            <Settings size={20} />
+            <span>Settings</span>
+          </button>
+          <div className="pv-sidebar-brand-card">
+            <img src={pandaVaultLogo} alt="" />
+            <div><strong>PANDA<span>VAULT</span></strong><small>v0.1.0 · ALPHA</small></div>
           </div>
-
-          <div className="system-card-copy">
-            <strong>
-              {steamError
-                ? "Steam unavailable"
-                : steamScan
-                  ? "Steam connected"
-                  : "Scanning Steam"}
-            </strong>
-            <span>
-              {steamError
-                ? "Check library settings"
-                : steamScan
-                  ? `${steamScan.games.length} games detected`
-                  : "Reading local library"}
-            </span>
-          </div>
-        </div>
-
-        <button
-          className={`settings-button ${
-            activeNav === "Settings" ? "settings-button-active" : ""
-          }`}
-          type="button"
-          onClick={() => setActiveNav("Settings")}
-          aria-current={activeNav === "Settings" ? "page" : undefined}
-          aria-label={sidebarCollapsed ? "Settings" : undefined}
-          title={sidebarCollapsed ? "Settings" : undefined}
-        >
-          <Settings size={19} strokeWidth={1.9} aria-hidden="true" />
-          <span className="settings-label">Settings</span>
-        </button>
-
-        <div className="sidebar-footer">
-          <span>ALPHA</span>
-          <span>v0.1.0</span>
         </div>
       </aside>
 
-      <main className="main-content">
-        <header className="topbar">
-          <div className="topbar-heading">
-            <button
-              className="topbar-menu-button"
-              type="button"
-              onClick={() => setSidebarCollapsed((value) => !value)}
-              aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-              title={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
-            >
-              <Menu size={20} aria-hidden="true" />
-            </button>
-
-            <div className="topbar-page">
-              <p className="eyebrow">
-                <Sparkles size={12} aria-hidden="true" />
-                YOUR GAMING CONTROL CENTRE
-              </p>
-
-              <div className="topbar-title-row">
-                <h1>{activeNav}</h1>
-                <span className="topbar-title-accent" aria-hidden="true" />
-              </div>
-            </div>
-          </div>
-
-          <div className="topbar-actions">
-            <label className="search-box">
-              <Search size={17} aria-hidden="true" />
-
-              <input
-                type="search"
-                placeholder="Search games, news and more"
-                aria-label="Search PandaVault"
-              />
-
-              <kbd>Ctrl K</kbd>
-            </label>
-
-            <span className="topbar-divider" aria-hidden="true" />
-
-            <button
-              className="icon-button"
-              type="button"
-              aria-label="Notifications"
-              title="Notifications"
-            >
-              <Bell size={18} aria-hidden="true" />
-            </button>
-
-            <button
-              className="profile-button"
-              type="button"
-              aria-label="PandaVault profile"
-              title="Profile"
-            >
-              <CircleUserRound size={19} aria-hidden="true" />
-            </button>
-          </div>
-        </header>
-
+      <main className="pv-app-main">
         {activeNav === "Settings" ? (
           <GameLibrariesPage />
-        ) : activeNav === "Library" ? (
+        ) : libraryActive ? (
           <LibraryPage
             games={steamScan?.games ?? []}
             epicGames={epicScan?.games ?? []}
@@ -627,10 +383,7 @@ function App() {
             onNavigate={setActiveNav}
           />
         ) : (
-          <FeaturePreviewPage
-            feature={activeNav}
-            onNavigate={setActiveNav}
-          />
+          <FeaturePreviewPage feature={activeNav} onNavigate={setActiveNav} />
         )}
       </main>
     </div>
