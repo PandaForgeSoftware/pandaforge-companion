@@ -26,6 +26,22 @@ export type LibrarySteamGame = {
   steamPlaytime2weeksMinutes: number | null;
 };
 
+export type LibraryEpicGame = {
+  appName: string;
+  name: string;
+  installPath: string;
+  installSize: number;
+  version: string | null;
+  catalogNamespace: string | null;
+  catalogItemId: string | null;
+  mainGameAppName: string | null;
+  mainGameCatalogNamespace: string | null;
+  mainGameCatalogItemId: string | null;
+  appCategories: string[];
+  technicalType: string | null;
+  launchExecutable: string | null;
+  isExecutable: boolean | null;
+};
 type GameArtwork = {
   appId: string;
   artworkPath: string | null;
@@ -60,6 +76,7 @@ type RunningGame = {
 
 type LibraryPageProps = {
   games: LibrarySteamGame[];
+  epicGames: LibraryEpicGame[];
   steamPath: string | null;
   loading: boolean;
   error: string | null;
@@ -142,6 +159,7 @@ function gameInitials(name: string) {
 
 export default function LibraryPage({
   games,
+  epicGames,
   steamPath,
   loading,
   error,
@@ -300,19 +318,45 @@ export default function LibraryPage({
       setLaunchingAppId(null);
     }
   }
+  const libraryGames = useMemo(
+    () => [
+      ...games.map((game) => ({
+        source: "steam" as const,
+        id: game.appId,
+        name: game.name,
+        installPath: game.installPath,
+        sizeOnDisk: game.sizeOnDisk,
+        lastPlayed: game.lastPlayed,
+        playtimeMinutes: game.steamPlaytimeMinutes,
+        steamGame: game,
+      })),
+      ...epicGames.map((game) => ({
+        source: "epic" as const,
+        id: game.appName,
+        name: game.name,
+        installPath: game.installPath,
+        sizeOnDisk: game.installSize,
+        lastPlayed: 0,
+        playtimeMinutes: null,
+        epicGame: game,
+      })),
+    ],
+    [games, epicGames],
+  );
+
   const visibleGames = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
 
-    const filtered = games.filter((game) => {
+    const filtered = libraryGames.filter((game) => {
       if (!normalizedQuery) {
         return true;
       }
 
       return [
         game.name,
-        game.appId,
+        game.id,
         game.installPath,
-        game.installDir,
+        game.source,
       ].some((value) =>
         value.toLocaleLowerCase().includes(normalizedQuery),
       );
@@ -329,21 +373,20 @@ export default function LibraryPage({
 
       return a.name.localeCompare(b.name);
     });
-  }, [games, query, sortMode]);
+  }, [libraryGames, query, sortMode]);
 
   const totalSize = useMemo(
-    () => games.reduce((total, game) => total + game.sizeOnDisk, 0),
-    [games],
+    () => libraryGames.reduce((total, game) => total + game.sizeOnDisk, 0),
+    [libraryGames],
   );
 
   const totalPlaytime = useMemo(
     () =>
-      games.reduce(
-        (total, game) =>
-          total + (game.steamPlaytimeMinutes ?? 0),
+      libraryGames.reduce(
+        (total, game) => total + (game.playtimeMinutes ?? 0),
         0,
       ),
-    [games],
+    [libraryGames],
   );
 
   const runningAppIds = useMemo(
@@ -372,7 +415,7 @@ export default function LibraryPage({
         <div className="pv-library-overview">
           <div className="pv-library-overview-item">
             <span>GAMES</span>
-            <strong>{games.length}</strong>
+            <strong>{libraryGames.length}</strong>
           </div>
 
           <div className="pv-library-overview-divider" />
@@ -408,7 +451,7 @@ export default function LibraryPage({
           </div>
 
           <span className="pv-library-view-note">
-            Steam library
+            Steam + Epic
           </span>
         </div>
 
@@ -457,7 +500,7 @@ export default function LibraryPage({
 
       {loading && (
         <div className="library-state-card">
-          <strong>Scanning Steam...</strong>
+          <strong>Scanning game libraries...</strong>
           <span>Reading your local installed games.</span>
         </div>
       )}
@@ -492,7 +535,7 @@ export default function LibraryPage({
         <div className="library-state-card">
           <strong>
             {games.length === 0
-              ? "No installed Steam games detected"
+              ? "No installed games detected"
               : "No games match your search"}
           </strong>
 
@@ -507,17 +550,32 @@ export default function LibraryPage({
       {!loading && !error && visibleGames.length > 0 && (
         <div className="pv-game-grid">
           {visibleGames.map((game) => {
-            const isRunning = runningAppIds.has(game.appId);
+            const isSteam = game.source === "steam";
+            const steamGame = isSteam ? game.steamGame : undefined;
+            const isRunning =
+              isSteam &&
+              steamGame !== undefined &&
+              runningAppIds.has(steamGame.appId);
+
+            const artwork =
+              isSteam && steamGame
+                ? artworkByAppId[steamGame.appId]
+                : undefined;
+
+            const isLaunching =
+              isSteam &&
+              steamGame !== undefined &&
+              launchingAppId === steamGame.appId;
 
             return (
               <article
                 className={`pv-game-card${isRunning ? " is-running" : ""}`}
-                key={game.appId}
+                key={`${game.source}:${game.id}`}
               >
                 <div className="pv-game-cover">
-                  {artworkByAppId[game.appId] ? (
+                  {artwork ? (
                     <img
-                      src={artworkByAppId[game.appId]}
+                      src={artwork}
                       alt={`${game.name} cover`}
                       onError={(event) => {
                         event.currentTarget.style.display = "none";
@@ -535,9 +593,7 @@ export default function LibraryPage({
                   <div
                     className="pv-game-cover-fallback"
                     style={{
-                      display: artworkByAppId[game.appId]
-                        ? "none"
-                        : "grid",
+                      display: artwork ? "none" : "grid",
                     }}
                   >
                     <strong>{gameInitials(game.name)}</strong>
@@ -546,7 +602,9 @@ export default function LibraryPage({
                   <div className="pv-game-cover-shade" />
 
                   <div className="pv-game-cover-top">
-                    <span className="pv-steam-badge">STEAM</span>
+                    <span className="pv-steam-badge">
+                      {isSteam ? "STEAM" : "EPIC"}
+                    </span>
 
                     {isRunning && (
                       <span className="pv-running-badge">
@@ -570,13 +628,15 @@ export default function LibraryPage({
 
                   <div className="pv-game-cover-playtime">
                     <Clock3 size={12} aria-hidden="true" />
-                    {formatSteamPlaytime(game.steamPlaytimeMinutes)}
+                    {isSteam
+                      ? formatSteamPlaytime(game.playtimeMinutes)
+                      : "Not tracked yet"}
                   </div>
                 </div>
 
                 <div className="pv-game-content">
                   <div className="pv-game-title">
-<h2 title={game.name}>{game.name}</h2>
+                    <h2 title={game.name}>{game.name}</h2>
                   </div>
 
                   <div className="pv-game-stats">
@@ -589,7 +649,11 @@ export default function LibraryPage({
                     <div>
                       <Clock3 size={13} aria-hidden="true" />
                       <span>LAST PLAYED</span>
-                      <strong>{formatSteamDate(game.lastPlayed)}</strong>
+                      <strong>
+                        {isSteam
+                          ? formatSteamDate(game.lastPlayed)
+                          : "Not tracked yet"}
+                      </strong>
                     </div>
                   </div>
 
@@ -599,30 +663,45 @@ export default function LibraryPage({
                       className={`pv-play-button${
                         isRunning ? " is-running" : ""
                       }`}
-                      onClick={() => launchGame(game)}
-                      disabled={isRunning || launchingAppId !== null}
+                      onClick={() => {
+                        if (steamGame) {
+                          void launchGame(steamGame);
+                        }
+                      }}
+                      disabled={
+                        !isSteam ||
+                        !steamGame ||
+                        isRunning ||
+                        launchingAppId !== null
+                      }
                       title={
-                        isRunning
-                          ? `${game.name} is currently running`
-                          : launchingAppId === game.appId
-                            ? `Launching ${game.name}`
-                            : `Launch ${game.name}`
+                        !isSteam
+                          ? "Epic launching will be enabled after launcher validation"
+                          : isRunning
+                            ? `${game.name} is currently running`
+                            : isLaunching
+                              ? `Launching ${game.name}`
+                              : `Launch ${game.name}`
                       }
                     >
                       <Play size={13} fill="currentColor" aria-hidden="true" />
                       {isRunning
                         ? "RUNNING"
-                        : launchingAppId === game.appId
+                        : isLaunching
                           ? "LAUNCHING..."
-                          : "PLAY"}
+                          : isSteam
+                            ? "PLAY"
+                            : "PLAY SOON"}
                     </button>
 
                     <span
                       className="pv-installed-status"
-                      aria-label="Installed through Steam"
+                      aria-label={`Installed through ${
+                        isSteam ? "Steam" : "Epic Games"
+                      }`}
                     >
                       <span className="pv-source-dot" />
-                      <strong>STEAM</strong>
+                      <strong>{isSteam ? "STEAM" : "EPIC"}</strong>
                       <span className="pv-source-separator">·</span>
                       <span>INSTALLED</span>
                     </span>

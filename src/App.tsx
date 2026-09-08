@@ -47,6 +47,30 @@ type SteamScanResult = {
 };
 
 
+type EpicGame = {
+  appName: string;
+  name: string;
+  installPath: string;
+  installSize: number;
+  version: string | null;
+  catalogNamespace: string | null;
+  catalogItemId: string | null;
+  mainGameAppName: string | null;
+  mainGameCatalogNamespace: string | null;
+  mainGameCatalogItemId: string | null;
+  appCategories: string[];
+  technicalType: string | null;
+  launchExecutable: string | null;
+  isExecutable: boolean | null;
+};
+
+type EpicScanResult = {
+  launcherFound: boolean;
+  manifestDirectoryFound: boolean;
+  manifestPath: string;
+  games: EpicGame[];
+  warnings: string[];
+};
 type XboxCandidate = {
   name: string;
   packageName: string;
@@ -248,6 +272,8 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [steamScan, setSteamScan] = useState<SteamScanResult | null>(null);
   const [steamError, setSteamError] = useState<string | null>(null);
+  const [epicScan, setEpicScan] = useState<EpicScanResult | null>(null);
+  const [epicError, setEpicError] = useState<string | null>(null);
   const [, setXboxScan] = useState<XboxScanResult | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
@@ -283,6 +309,42 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isTauri()) {
+      setEpicScan({
+        launcherFound: false,
+        manifestDirectoryFound: false,
+        manifestPath: "",
+        games: [],
+        warnings: [],
+      });
+      setEpicError(null);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    invoke<EpicScanResult>("scan_epic_games")
+      .then((result) => {
+        if (!cancelled) {
+          setEpicScan(result);
+          setEpicError(null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setEpicScan(null);
+          setEpicError(String(error));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
 
@@ -551,9 +613,10 @@ function App() {
         ) : activeNav === "Library" ? (
           <LibraryPage
             games={steamScan?.games ?? []}
+            epicGames={epicScan?.games ?? []}
             steamPath={steamScan?.steamPath ?? null}
             loading={!steamScan && !steamError}
-            error={steamError}
+            error={steamError ?? epicError}
           />
         ) : activeNav === "Home" ? (
           <HomePage
