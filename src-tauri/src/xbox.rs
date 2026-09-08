@@ -125,7 +125,7 @@ fn scan_windows_packages() -> Result<Vec<XboxGame>, String> {
             format!("Unable to read Windows package discovery results: {error}")
         })
     } else {
-        let game = serde_json::from_str::<XboxGame>>(json).map_err(|error| {
+        let game = serde_json::from_str::<XboxGame>(json).map_err(|error| {
             format!("Unable to read Windows package discovery result: {error}")
         })?;
 
