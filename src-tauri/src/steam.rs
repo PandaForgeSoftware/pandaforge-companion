@@ -6,6 +6,9 @@ use std::{
     process::Command,
 };
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SteamGame {
@@ -251,6 +254,7 @@ fn apply_local_steam_playtimes(games: &mut [SteamGame]) {
 fn steam_path_from_registry() -> Option<PathBuf> {
     let output = Command::new("reg")
         .args(["query", r"HKCU\Software\Valve\Steam", "/v", "SteamPath"])
+        .creation_flags(0x08000000)
         .output()
         .ok()?;
 
